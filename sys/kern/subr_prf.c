@@ -446,7 +446,8 @@ putlogpri(int level)
 }
 
 #ifndef KLOG_NOTIMESTAMP
-static int needtstamp = 1;
+static int log_needtstamp = 1;
+static int cons_needtstamp = 1;
 int log_ts_prec = 7;
 
 static void
@@ -497,13 +498,28 @@ putchar(int c, int flags, struct tty *tp)
 	}
 
 #ifndef KLOG_NOTIMESTAMP
-	if (c != '\0' && c != '\n' && needtstamp && (flags & NOTSTAMP) == 0) {
-		addtstamp(flags, tp);
-		needtstamp = 0;
-	}
+        if (c != '\0' && c != '\n' && (flags & NOTSTAMP) == 0) {
+          int tsflags = 0;
 
-	if (c == '\n')
-		needtstamp = 1;
+          if ((flags & TOLOG) && log_needtstamp) {
+            tsflags |= TOLOG;
+            log_needtstamp = 0;
+          }
+          if ((flags & TOCONS) && cons_needtstamp) {
+            tsflags |= TOCONS;
+            cons_needtstamp = 0;
+          }
+          if (tsflags != 0)
+            addtstamp(tsflags, tp);
+        }
+
+        if (c == '\n') {
+          if (flags & TOLOG)
+            log_needtstamp = 1;
+          if (flags & TOCONS)
+            cons_needtstamp = 1;
+        }
+
 #endif
 	putone(c, flags, tp);
 
